@@ -1,5 +1,26 @@
 # Rota Seca — API do app (C# Software Development)
 
+## Integrantes
+
+- Camila Mie Takara RM555418
+- Guilherme Barbiero RM555185
+- Marco Antonio Gonçalves RM556818
+- Mateus Cantiere RM558479
+- Vinicius Castro RM556137
+
+## Ficha da CitizenTech
+
+| Campo | Conteúdo |
+|---|---|
+| Nome da CitizenTech | Rota Seca |
+| Cidade e bairro | São Paulo, SP — região piloto com histórico de alagamento (Centro, nos dados simulados) |
+| Cidadão beneficiado | Quem se desloca na chuva a pé, de moto, de bicicleta ou de ônibus, e quem mora em área de risco |
+| Problema, em uma frase | Ninguém sabe, antes de sair de casa, se o caminho vai alagar: os mapas só mostram o alagamento depois que ele acontece, e o alerta oficial chega tarde e para a região inteira |
+| Como funciona | Probabilidade de alagamento por trecho a cada 15 min, a partir da intensidade da chuva, do histórico, do relevo e dos relatos; alertas sobre os Meus Lugares e rotas que desviam da água em três modos (a pé, moto/bike, carro/ônibus) |
+| O que cada parte faz | App (Mobile), API do app (C#), Serviço de Risco da Rua (SOA), modelo de probabilidade (ML), sensor de nível de água (IoT), infra Linux (OS), módulo PII (Cyber), Features e testes (Testing) |
+| Link do repositório | https://github.com/SEU_USUARIO/SEU_REPOSITORIO |
+| Indicador de impacto | % de rotas que desviaram de trecho com risco alto; acerto do modelo; minutos de antecedência do alerta |
+| ODS conectados | 11 (11.5), 13 (13.1 e 13.3), 3 (3.9), 9 (9.1), 10 (10.2) |
 
 ## 1. Contextualização do problema
 
@@ -149,10 +170,147 @@ localizações aproximadas da região central de São Paulo.
 - Acréscimo médio de tempo da rota segura em relação à rota padrão;
 - Percentual de reportes confirmados por um segundo usuário.
 
-## Integrantes
+## 7. Arquitetura e tecnologias
 
-- Camila Mie Takara RM55548
-- Guilherme Barbiero RM555185
-- Marco Antonio Gonçalves RM556818
-- Mateus Cantiere RM558479
-- Vinicius Castro RM556137
+**Stack:** .NET 10 · ASP.NET Core Web API · Entity Framework Core · SQLite · Scalar (OpenAPI) · xUnit · Moq
+
+```
+Controllers  →  Services  →  Repositories (EF Core)  →  SQLite
+                   │
+                   └──→  Integrations (IRiscoProvider, IChuvaProvider, IRoteadorProvider)
+```
+
+| Conceito | Onde está aplicado |
+|---|---|
+| **Programação Orientada a Objetos** | `EntidadeBase` abstrata com herança; encapsulamento por setters privados e métodos com regras de negócio (`Confirmar`, `RegistrarQueAguaBaixou`, `RegistrarRisco`); `Validar()` sobrescrito em cada entidade; objeto de valor imutável `Coordenada` |
+| **Polimorfismo (Strategy)** | `IModoDeslocamento` com as implementações `APe`, `MotoBike` e `CarroOnibus`, cada uma com seu limite de bloqueio; `CarroOnibus` sobrescreve o cálculo de duração |
+| **Interfaces e Injeção de Dependência** | Todos os serviços, repositórios e provedores são registrados no `Program.cs` e recebidos pelo construtor; o provedor de risco (simulado ou HTTP) é escolhido pelo `appsettings.json` |
+| **Entity Framework Core** | `AppDbContext`, configurações via Fluent API (`Data/Configurations`), migrations versionadas, dados iniciais (seed) e validação das entidades no `SaveChangesAsync` |
+| **LINQ** | Consultas com `Where`, `OrderBy`, `GroupBy`, `Count`, `Average`, `Any`, `Include` e `Take` nos repositórios; seleção da rota recomendada com `Where`/`OrderBy`/`ThenBy` |
+| **Programação assíncrona** | Todas as camadas `async`/`await` com `CancellationToken`; `Task.WhenAll` para consultar riscos em paralelo; `BackgroundService` com `PeriodicTimer` gerando alertas a cada 15 minutos |
+| **API REST** | 6 controllers, DTOs de entrada e saída, status HTTP adequados (200, 201, 204, 400, 404, 503) e tratamento global de erros no padrão `ProblemDetails` |
+| **Testes unitários** | Projeto `RotaSeca.Tests` com 27 testes (xUnit + Moq) cobrindo entidades, estratégias de deslocamento e serviços |
+
+### Estrutura de pastas
+
+```
+RotaSeca/
+├─ BackgroundJobs/   job de alertas a cada 15 minutos
+├─ Controllers/      endpoints REST
+├─ Data/             DbContext e configurações do EF Core
+├─ Domain/           entidades, enums, exceções, objetos de valor e estratégias de modo
+├─ DTOs/             contratos de entrada e saída da API
+├─ Integrations/     interfaces e provedores (simulados e HTTP)
+├─ Mappings/         conversão de entidades para DTOs
+├─ Middlewares/      tratamento global de exceções
+├─ Migrations/       migrations do EF Core
+├─ Repositories/     acesso a dados com LINQ
+└─ Services/         regras de aplicação
+RotaSeca.Tests/      testes unitários
+evid/                evidências de funcionamento
+```
+
+## 8. Como executar
+
+### Pré-requisitos
+- .NET 10 SDK
+- Visual Studio 2022 (17.13 ou superior) ou Visual Studio 2026
+
+### Pelo Visual Studio
+1. Clone o repositório e abra o arquivo `RotaSeca.slnx`.
+2. Pressione `Ctrl+F5` (Iniciar sem Depuração). O banco SQLite é criado automaticamente na primeira execução, com dados iniciais simulados.
+3. A documentação dos endpoints abre no navegador em `https://localhost:<porta>/scalar`.
+4. As requisições de exemplo estão no arquivo `RotaSeca/RotaSeca.http`. Ajuste a porta na primeira linha, se necessário.
+5. Para rodar os testes: **Teste → Executar Todos os Testes**.
+
+### Pela linha de comando
+```bash
+dotnet run --project RotaSeca
+dotnet test
+```
+
+## Endpoints
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | /lugares | Salva um lugar |
+| GET | /lugares?usuarioId= | Lista lugares com o risco atual |
+| GET | /lugares/em-risco?usuarioId=&limite= | Lugares com risco ≥ limite na próxima hora |
+| PUT | /lugares/{id} | Atualiza um lugar |
+| DELETE | /lugares/{id} | Remove um lugar |
+| POST | /rotas | Calcula até 3 rotas (origem, destino, modo) |
+| POST | /reportes | Reporta alagamento |
+| GET | /reportes | Reportes ativos |
+| POST | /reportes/{id}/confirmar | Confirma um reporte |
+| POST | /reportes/{id}/agua-baixou | Avisa que a água baixou |
+| GET | /alertas?usuarioId= | Lista alertas |
+| POST | /alertas/gerar?usuarioId= | Força a verificação de alertas |
+| GET | /historico?usuarioId= | Histórico e indicador de impacto |
+| POST / GET | /usuarios | Cria e consulta usuários |
+
+## Evidências de funcionamento
+
+As evidências abaixo foram geradas com a API em execução local, a partir das requisições
+do arquivo `RotaSeca/RotaSeca.http`. Todos os dados utilizados são simulados.
+
+### 1. Documentação dos endpoints (Scalar)
+A documentação interativa é gerada automaticamente a partir do OpenAPI e fica disponível
+em `/scalar` ao executar a aplicação.
+
+![Documentação no Scalar](evid/01-scalar.png)
+
+### 2. Cálculo de rota no modo a pé
+Requisição `POST /rotas` com o modo `APe`. Como o limite de bloqueio para pedestres é 40%,
+a via direta, que passa próxima ao Vale do Anhangabaú, é marcada como bloqueada, e o
+sistema recomenda a alternativa de menor risco.
+
+![Rota a pé com via bloqueada e alternativa recomendada](evid/02-rota-ape.png)
+
+### 3. Mesma rota no modo carro/ônibus
+O mesmo trajeto, calculado com o modo `CarroOnibus` (limite de 70%), apresenta menos
+bloqueios. Isso evidencia o polimorfismo da estratégia `IModoDeslocamento`: a mesma
+probabilidade de alagamento leva a decisões diferentes conforme o modo de deslocamento.
+
+![Rota de carro/ônibus](evid/03-rota-carro.png)
+
+### 4. Lugares com risco acima de 50% na próxima hora
+Requisição `GET /lugares/em-risco`. A API atualiza o risco de cada lugar salvo de forma
+concorrente (`Task.WhenAll`) e filtra no banco, via LINQ, apenas os lugares cujo risco é
+igual ou superior ao limite informado.
+
+![Lugares em risco](evid/04-lugares-em-risco.png)
+
+### 5. Reporte de alagamento confirmado por outros usuários
+Um reporte criado por `POST /reportes` passa ao status `Confirmado` após duas
+confirmações (`POST /reportes/{id}/confirmar`), regra implementada na própria entidade
+`Reporte`.
+
+![Reporte confirmado](evid/05-reporte-confirmado.png)
+
+### 6. Histórico e indicador de impacto
+Requisição `GET /historico`. O resumo é calculado com consultas LINQ (`Count`, `GroupBy`
+e `Average`) e apresenta o percentual de rotas que desviaram de trechos de alto risco,
+indicador de impacto definido na Ficha da CitizenTech.
+
+![Histórico e indicador de impacto](evid/06-historico.png)
+
+### 7. Tratamento de erro: requisição inválida (400)
+O cadastro de um lugar com etiqueta vazia viola uma regra de domínio. O tratamento global
+de exceções converte a `DomainException` em uma resposta `400 Bad Request` no padrão
+`ProblemDetails`.
+
+![Erro 400](evid/07-erro-400.png)
+
+### 8. Tratamento de erro: recurso inexistente (404)
+A consulta a um usuário inexistente gera uma `NotFoundException`, convertida em
+`404 Not Found`.
+
+![Erro 404](evid/08-erro-404.png)
+
+### 9. Testes unitários
+O projeto `RotaSeca.Tests` reúne 27 testes (xUnit + Moq), que cobrem as regras das
+entidades, as estratégias de modo de deslocamento e os serviços de rota e de alertas,
+com os provedores externos e os repositórios substituídos por mocks.
+
+![27 testes aprovados](evid/09-testes.png)
+
+
