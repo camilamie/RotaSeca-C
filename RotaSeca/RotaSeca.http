@@ -1,0 +1,87 @@
+@RotaSeca_HostAddress = http://localhost:5059
+
+### 1. Listar Meus Lugares do usuário 1 (seed: Trabalho e Casa)
+GET {{RotaSeca_HostAddress}}/lugares?usuarioId=1
+
+### 2. Salvar um lugar novo
+POST {{RotaSeca_HostAddress}}/lugares
+Content-Type: application/json
+
+{
+  "usuarioId": 1,
+  "etiqueta": "Faculdade",
+  "endereco": "Endereço simulado - Av. Paulista",
+  "latitude": -23.5640,
+  "longitude": -46.6527,
+  "dias": "Segunda, Quarta",
+  "horarioHabitual": "19:00:00"
+}
+
+### 3. NEGATIVO: etiqueta vazia (espera 400)
+POST {{RotaSeca_HostAddress}}/lugares
+Content-Type: application/json
+
+{ "usuarioId": 1, "etiqueta": "", "endereco": "Endereço simulado", "latitude": -23.56, "longitude": -46.65 }
+
+### 4. Lugares com risco acima de 50% na próxima hora
+GET {{RotaSeca_HostAddress}}/lugares/em-risco?usuarioId=1&limite=0.5
+
+### 5. Calcular rota A PÉ (Liberdade -> Luz): a via direta deve aparecer bloqueada
+POST {{RotaSeca_HostAddress}}/rotas
+Content-Type: application/json
+
+{
+  "usuarioId": 1,
+  "origem":  { "latitude": -23.5580, "longitude": -46.6350 },
+  "destino": { "latitude": -23.5350, "longitude": -46.6340 },
+  "modo": "APe"
+}
+
+### 6. Mesma rota de CARRO/ÔNIBUS (limite maior, menos bloqueios)
+POST {{RotaSeca_HostAddress}}/rotas
+Content-Type: application/json
+
+{
+  "usuarioId": 1,
+  "origem":  { "latitude": -23.5580, "longitude": -46.6350 },
+  "destino": { "latitude": -23.5350, "longitude": -46.6340 },
+  "modo": "CarroOnibus"
+}
+
+### 7. NEGATIVO: origem igual ao destino (espera 400)
+POST {{RotaSeca_HostAddress}}/rotas
+Content-Type: application/json
+
+{
+  "usuarioId": 1,
+  "origem":  { "latitude": -23.5580, "longitude": -46.6350 },
+  "destino": { "latitude": -23.5580, "longitude": -46.6350 },
+  "modo": "APe"
+}
+
+### 8. Reportar alagamento
+POST {{RotaSeca_HostAddress}}/reportes
+Content-Type: application/json
+
+{ "usuarioId": 2, "latitude": -23.5452, "longitude": -46.6381, "nivel": "Joelho", "comentario": "Água subindo rápido" }
+
+### 9. Confirmar o reporte 1 (duas confirmações = Confirmado)
+POST {{RotaSeca_HostAddress}}/reportes/1/confirmar
+
+### 10. Avisar que a água baixou (dois avisos = Encerrado)
+POST {{RotaSeca_HostAddress}}/reportes/1/agua-baixou
+
+### 11. Reportes ativos das últimas 6 horas
+GET {{RotaSeca_HostAddress}}/reportes?ultimasHoras=6
+
+### 12. Gerar alertas agora para o usuário 1
+POST {{RotaSeca_HostAddress}}/alertas/gerar?usuarioId=1
+
+### 13. Listar alertas
+GET {{RotaSeca_HostAddress}}/alertas?usuarioId=1
+
+### 14. Histórico e indicador de desvio
+GET {{RotaSeca_HostAddress}}/historico?usuarioId=1
+
+### 15. NEGATIVO: usuário inexistente (espera 404)
+GET {{RotaSeca_HostAddress}}/lugares?usuarioId=999

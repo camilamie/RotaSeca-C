@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RotaSeca.Tests/RotaSeca.Tests.csproj" Id="967b1946-d7c6-42e1-b245-9052cb4dbcf4" />
+  <Project Path="RotaSeca/RotaSeca.csproj" />
+</Solution>
